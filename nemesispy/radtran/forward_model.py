@@ -7,12 +7,15 @@ import numpy as np
 from nemesispy.radtran.calc_mmw import calc_mmw
 from nemesispy.radtran.read import read_kls
 from nemesispy.radtran.calc_radiance import calc_radiance
+from nemesispy.radtran.calc_radiance import calc_transm
 from nemesispy.radtran.read import read_cia
 from nemesispy.radtran.calc_layer import calc_layer
+from nemesispy.radtran.calc_layer import calc_layer_transm
 from nemesispy.common.calc_trig import gauss_lobatto_weights
 from nemesispy.common.interpolate_gcm import interp_gcm
 from nemesispy.common.calc_hydrostat import calc_hydrostat
 from nemesispy.radtran.calc_radiance import calc_weighting
+from nemesispy.radtran.calc_radiance import calc_weighting_transm
 import time
 class ForwardModel():
 
@@ -61,7 +64,7 @@ class ForwardModel():
         """
         self.M_plt = M_plt
         self.R_plt = R_plt
-        # self.R_star = R_star
+        self.R_star = R_star
         # self.T_star = T_star
         # self.semi_major_axis = semi_major_axis
         self.gas_name_list = gas_name_list
@@ -97,9 +100,17 @@ class ForwardModel():
         self.wave_grid = wave_grid
         self.g_ord = g_ord
         self.del_g = del_g
+
+        self.k_gas_w_g_p_t = k_gas_w_g_p_t # key
+        # print('Loaded ktables', k_gas_w_g_p_t, k_gas_w_g_p_t.shape)
+        # P_deep = 1.0
+        # P_top = -7.0
+        # P_fortran = np.logspace(P_deep, P_top, 22)
+        # P_python = P_fortran * 101325.0
         self.k_table_P_grid = k_table_P_grid
         self.k_table_T_grid = k_table_T_grid
-        self.k_gas_w_g_p_t = k_gas_w_g_p_t # key
+        # self.k_table_T_grid = np.ones(27) * 1500.0
+
 
         cia_nu_grid, cia_T_grid, k_cia_pair_t_w = read_cia(cia_file_path)
         self.cia_nu_grid = cia_nu_grid
@@ -136,6 +147,33 @@ class ForwardModel():
 
         return weighting_function
 
+    def calc_weighting_function_transm(self, P_model, T_model, VMR_model,
+        path_angle=90, solspec=[]):
+
+        NPRO = len(P_model)
+        mmw = np.zeros(P_model.shape)
+        for ipro in range(NPRO):
+            mmw[ipro] = calc_mmw(self.gas_id_list,VMR_model[ipro,:])
+        H_model = calc_hydrostat(P=P_model, T=T_model, mmw=mmw,
+            M_plt=self.M_plt, R_plt=self.R_plt)
+        H_layer,H_base,P_layer,P_base,T_layer,VMR_layer,U_layer,dH,scale \
+            = calc_layer_transm(
+            self.R_plt, H_model, P_model, T_model, VMR_model,
+            self.gas_id_list, self.NLAYER, path_angle, layer_type=1,
+            H_0=0.0
+            )
+
+        if len(solspec)==0:
+            solspec = np.ones(len(self.wave_grid))
+
+        weighting_function = calc_weighting_transm(self.wave_grid, H_layer,H_base, U_layer, P_layer, P_base, T_layer,
+            VMR_layer, self.k_gas_w_g_p_t, self.k_table_P_grid,
+            self.k_table_T_grid, self.del_g, ScalingFactor=scale,
+            R_plt=self.R_plt, R_star=self.R_star,solspec=solspec, k_cia=self.k_cia_pair_t_w,
+            ID=self.gas_id_list,cia_nu_grid=self.cia_nu_grid,
+            cia_T_grid=self.cia_T_grid, dH=dH)
+
+        return weighting_function
 
     def calc_point_spectrum(self, H_model, P_model, T_model, VMR_model,
         path_angle, solspec=[]):
@@ -161,6 +199,42 @@ class ForwardModel():
             cia_T_grid=self.cia_T_grid, dH=dH)
 
         return point_spectrum
+    
+    def calc_transm_spectrum(self, H_model, P_model, T_model, VMR_model,
+        path_angle, Hknee, power, solspec=[]):
+        """
+        Calculate average layer properties from model inputs,
+        then compute the transmission spectrum.
+        """
+
+        NPRO = len(P_model)
+        mmw = np.zeros(P_model.shape)
+
+        for ipro in range(NPRO):
+            mmw[ipro] = calc_mmw(self.gas_id_list,VMR_model[ipro,:])
+        H_model = calc_hydrostat(P=P_model, T=T_model, mmw=mmw,
+            M_plt=self.M_plt, R_plt=self.R_plt)
+        H_layer,H_base,P_layer,P_base,T_layer,VMR_layer,U_layer,dH,scale \
+            = calc_layer_transm(
+            self.R_plt, H_model, P_model, T_model, VMR_model,
+            self.gas_id_list, self.NLAYER, path_angle, layer_type=1,
+            H_0=0.0
+            )
+
+        if len(solspec)==0:
+            solspec = np.ones(len(self.wave_grid))
+
+        # H_layer = np.array([0.0, 1257.20, 2530.04, 3774.49, 4846.58]) * 1e3
+        wv, transm_spectrum = calc_transm(self.wave_grid, H_layer,H_base, U_layer, P_layer, P_base,T_layer,
+            VMR_layer, self.k_gas_w_g_p_t, self.k_table_P_grid,
+            self.k_table_T_grid, self.del_g, ScalingFactor=scale,
+            R_plt=self.R_plt, R_star=self.R_star, solspec=solspec, k_cia=self.k_cia_pair_t_w,
+            ID=self.gas_id_list,cia_nu_grid=self.cia_nu_grid,
+            cia_T_grid=self.cia_T_grid, dH=dH, mmw=mmw, Hknee=Hknee, power=power)
+        
+        # print("P_grid", self.k_table_P_grid)
+
+        return wv, transm_spectrum
 
     def calc_point_spectrum_hydro(self, P_model, T_model, VMR_model,
         path_angle, solspec=[]):

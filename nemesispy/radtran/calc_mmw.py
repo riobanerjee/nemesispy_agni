@@ -5,7 +5,9 @@ Calculate mean molecular weight
 """
 from nemesispy.common.info_mol import mol_info
 from nemesispy.common.constants import AMU
+# from numba import jit
 
+# @jit(nopython=True)
 def calc_mmw(ID, VMR, ISO=[]):
     """
     Calculate mean molecular weight in kg given a list of molecule IDs and

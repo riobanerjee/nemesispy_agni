@@ -80,6 +80,10 @@ def calc_tau_gas(k_gas_w_g_p_t, P_layer, T_layer, VMR_layer, U_layer,
 
     return tau_w_g_l
 
+# fortran first number in multi d array cycles fastest, python last number fastest
+# row major or column major, try it
+# python left one is outside loop
+# fortran is opposite
 @jit(nopython=True)
 def interp_k(P_grid, T_grid, P_layer, T_layer, k_w_g_p_t):
     """
