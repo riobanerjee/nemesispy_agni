@@ -5,9 +5,24 @@ Calculate collision-induced-absorption optical path.
 """
 import numpy as np
 from numba import jit
+import pandas as pd
+# from scipy.interpolate import pchip_interpolate
+from nemesispy.common.constants import N_A
+import os
 
 @jit(nopython=True)
 def co2cia(wave_grid):
+    """
+    Calculates CO2-CO2 CIA absorption coefficients.
+    Parameters
+    ----------
+    wave_grid : ndarray
+
+    Returns
+    -------
+    co2cia : ndarray
+        CO2-CO2 CIA absorption coefficients.
+    """
 
     # CO2 CIA
     NWAVE = len(wave_grid)
@@ -30,10 +45,43 @@ def co2cia(wave_grid):
 
     return co2cia
 
+# At 400K, but not very T dependent anyway
+# @jit(nopython=True)
+# def n2n2cia(wave_grid):
+#     """
+#     Calculates N2-N2 CIA absorption coefficients.
+#     Parameters
+#     ----------
+#     wave_grid : ndarray
+
+#     Returns
+#     -------
+#     n2n2cia : ndarray
+#         N2-N2 CIA absorption coefficients.
+#     """
+#     __location__ = os.environ['nemesispy_dir']
+#     cia_path = os.path.join(__location__, "nemesispy/data/cia/n2n2.cia")
+#     df = pd.read_csv(cia_path, header=None, skiprows=1, delim_whitespace=True)
+#     df.columns = ['wavenumber', 'absorption_coef']
+#     wavenumber = df['wavenumber'].values
+#     wavenumber = wavenumber[::-1]
+#     abs_coef = df['absorption_coef'].values
+#     # only k2v ?
+#     abs_coef = abs_coef[::-1]
+#     wavelengths = 1e4/wavenumber[:]
+#     # amagat = 2.68675E19
+#     amagat = 44.615 * N_A / 1e6
+#     abs_coef = abs_coef[:] * (amagat**2)
+#     # aprx_coef = pchip_interpolate(wavelengths, abs_coef, wave_grid)
+#     aprx_coef = np.interp(wave_grid, wavelengths, abs_coef)
+
+#     # units?
+#     return aprx_coef
+
 @jit(nopython=True)
 def calc_tau_cia(wave_grid, K_CIA, ISPACE,
     ID, TOTAM, T_layer, P_layer, VMR_layer, DELH,
-    cia_nu_grid, TEMPS, INORMAL, NPAIR=9):
+    cia_nu_grid, TEMPS, INORMAL, NPAIR=9, aprx_coef=None):
     """
     Calculates
     Parameters
@@ -102,11 +150,11 @@ def calc_tau_cia(wave_grid, K_CIA, ISPACE,
     TOTAM = TOTAM * 1.0e-4 # cm-2
 
     ### back to FORTRAN ORIGINAL
-    P0=101325
-    T0=273.15
-    AMAGAT = 2.68675E19 #mol cm-3
+    P0 = 101325
+    T0 = 273.15
+    AMAGAT = 2.68675E19 #molecules cm-3
     KBOLTZMANN = 1.381E-23
-    MODBOLTZA = 10.*KBOLTZMANN/1.013
+    MODBOLTZA = 10 * KBOLTZMANN/1.013
 
     tau = (P_layer/P0)**2 * (T0/T_layer)**2 * DELH
     height1 = P_layer * MODBOLTZA * T_layer
@@ -115,7 +163,6 @@ def calc_tau_cia(wave_grid, K_CIA, ISPACE,
     amag1 = TOTAM /height/AMAGAT
     tau = height*amag1**2
 
-    AMAGAT = 2.68675E19 #mol cm-3
     amag1 = TOTAM / XLEN / AMAGAT # number density
     tau = XLEN*amag1**2# optical path, why fiddle around with XLEN
 
@@ -191,6 +238,7 @@ def calc_tau_cia(wave_grid, K_CIA, ISPACE,
 
             #Combining the CIA absorption of the different pairs (included in .cia file)
             sum1 = np.zeros(NWAVEC)
+            # print(k_cia[:,2])
             if INORMAL==0: # equilibrium hydrogen (1:1)
                 sum1[:] = sum1[:] + k_cia[:,0] * qh2[ilay] * qh2[ilay] \
                     + k_cia[:,1] * qhe[ilay] * qh2[ilay]
@@ -209,15 +257,15 @@ def calc_tau_cia(wave_grid, K_CIA, ISPACE,
             """
             TO BE DONE
             """
-            k_co2 = sum1*0
+            # k_co2 = sum1*0
             # k_co2 = co2cia(wave_grid)
 
-            sum1[:] = sum1[:] + k_co2[:] * qco2[ilay] * qco2[ilay]
+            # sum1[:] = sum1[:] + k_co2[:] * qco2[ilay] * qco2[ilay]
 
             #Look up N2-N2 NIR CIA coefficients
-            """
-            TO BE DONE
-            """
+            if aprx_coef is not None:
+                sum1[:] = sum1[:] + aprx_coef[::-1] * qn2[ilay] * qn2[ilay]
+
             # TO BE DONE
 
             #Look up N2-H2 NIR CIA coefficients

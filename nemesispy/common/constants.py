@@ -24,6 +24,8 @@ R_JUP = 6.9911e7          # m Jupiter radius
 R_JUP_E = 7.1492e7        # m nominal equatorial Jupiter radius
 M_SUN = 1.98847542e+30    # kg solar mass
 M_JUP = 1.898e27          # kg Jupiter mass
+R_EAR_E = 6.3781e6          # m Earth radius
+M_EAR = 5.9722e24         # kg Earth mass
 
 # Others
 ATM = 101325              # Pa atmospheric pressure

@@ -29,7 +29,7 @@ __location__ = os.path.realpath(
 ### Low resolution k-table, HST/WFC3 + Spizter wavelengths
 ktable_path = os.path.join(__location__, "ktables")
 lowres_file_paths = [
-     'H2O_test.kta']
+     'h2owasp43.kta','co2wasp43.kta','ch4wasp43.kta','co2wasp43.kta']
 for ipath,path in enumerate(lowres_file_paths):
     lowres_file_paths[ipath] = os.path.join(ktable_path,path)
 

@@ -9,10 +9,12 @@ print('Loading libraries...')
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
-
+from nemesispy.common.constants import ATM
 from nemesispy.radtran.forward_model import ForwardModel
 from nemesispy.common.constants import G
 from nemesispy.models.TP_profiles import TP_Guillot
+from nemesispy.models.gas_profiles import gen_vmr
+
 from nemesispy.data.helper import lowres_file_paths, cia_file_path
 
 ### Wavelength grid
@@ -36,21 +38,21 @@ error = np.array([4.5e-05, 3.9e-05, 3.8e-05, 3.6e-05, 3.7e-05, 3.3e-05, 3.4e-05,
        4.2e-05, 6.0e-05, 8.4e-05])
 
 ### VMR and pressure models
-def gen_vmr(NLAYER,h2o,co2,co,ch4):
-    h2 = (1-h2o-co2-co-ch4)*0.85
-    he = (1-h2o-co2-co-ch4)*0.15
-    VMR_model = np.zeros((NLAYER,6))
-    VMR_model[:,0] = h2o
-    VMR_model[:,1] = co2
-    VMR_model[:,2] = co
-    VMR_model[:,3] = ch4
-    VMR_model[:,4] = he
-    VMR_model[:,5] = h2
-    return VMR_model
+# def gen_vmr(NLAYER,h2o,co2,co,ch4):
+#     h2 = (1-h2o-co2-co-ch4)*0.85
+#     he = (1-h2o-co2-co-ch4)*0.15
+#     VMR_model = np.zeros((NLAYER,6))
+#     VMR_model[:,0] = h2o
+#     VMR_model[:,1] = co2
+#     VMR_model[:,2] = co
+#     VMR_model[:,3] = ch4
+#     VMR_model[:,4] = he
+#     VMR_model[:,5] = h2
+#     return VMR_model
 
-def gen_pressure(low,high,NLAYER):
-    P_model = np.geomspace(low,high,NLAYER)
-    return P_model
+# def gen_pressure(low,high,NLAYER):
+#     P_model = np.geomspace(low,high,NLAYER)
+#     return P_model
 
 ### Reference Planet Input: WASP 43b
 T_star = 4520 # star temperature in K
@@ -61,22 +63,19 @@ R_plt = 74065.70 * 1e3 # m
 T_irr = T_star * (R_star/SMA)**0.5 # 2055 K
 T_eq = T_irr/2**0.5 # 1453 K
 g = G*M_plt/R_plt**2 # 47.39 ms-2
-gas_id = np.array([  1, 2,  5,  6, 40, 39])
-iso_id = np.array([0, 0, 0, 0, 0, 0])
+gas_id = np.array([  1, 40, 39])
+iso_id = np.array([0, 0, 0])
 
 ### Set up an initial atmospheric model
 # Pressure range
 NLAYER = 20
 P_deep_init = 20e5
 P_top_init = 100
-P_model = gen_pressure(P_deep_init,P_top_init,NLAYER)
+# P_model = gen_pressure(P_deep_init,P_top_init,NLAYER)
+P_model = np.logspace(1, -7, 20) * ATM
 # Gas volume mixing ratios
-H2O_init = -8
-CO2_init = -8
-CO_init = -8
-CH4_init = -8
-VMR_model_init = gen_vmr(NLAYER,10**H2O_init,10**CO2_init,10**CO_init,
-    10**CH4_init)
+H2O_init = np.array([-8.0])
+VMR_model_init = gen_vmr(NLAYER, H2O_init)
 # Temperature-pressure profile
 k_IR0 = 10**-3
 gamma0 = 10**-2
@@ -122,73 +121,73 @@ plt.subplots_adjust(wspace=0.3)
 ### Slider Axes
 axcolor = 'lightgoldenrodyellow'
 
-axkappa = plt.axes([0.6, 0.35, 0.30, 0.03], facecolor=axcolor)
-axgamma = plt.axes([0.6, 0.30, 0.30, 0.03], facecolor=axcolor)
-axf = plt.axes([0.6, 0.25, 0.30, 0.03], facecolor=axcolor)
-axT_int = plt.axes([0.6, 0.20, 0.30, 0.03], facecolor=axcolor)
+# axkappa = plt.axes([0.6, 0.35, 0.30, 0.03], facecolor=axcolor)
+# axgamma = plt.axes([0.6, 0.30, 0.30, 0.03], facecolor=axcolor)
+# axf = plt.axes([0.6, 0.25, 0.30, 0.03], facecolor=axcolor)
+# axT_int = plt.axes([0.6, 0.20, 0.30, 0.03], facecolor=axcolor)
 
-axP_top = plt.axes([0.10, 0.35, 0.30, 0.03], facecolor=axcolor)
-axP_deep = plt.axes([0.10, 0.30, 0.30, 0.03], facecolor=axcolor)
-axNlayer = plt.axes([0.10, 0.25, 0.30, 0.03], facecolor=axcolor)
-axH2O = plt.axes([0.10, 0.20, 0.30, 0.03], facecolor=axcolor)
-axCO2 = plt.axes([0.10, 0.15, 0.30, 0.03], facecolor=axcolor)
-axCO = plt.axes([0.10, 0.10, 0.30, 0.03], facecolor=axcolor)
-axCH4 = plt.axes([0.10, 0.05, 0.30, 0.03], facecolor=axcolor)
+# axP_top = plt.axes([0.10, 0.35, 0.30, 0.03], facecolor=axcolor)
+# axP_deep = plt.axes([0.10, 0.30, 0.30, 0.03], facecolor=axcolor)
+# axNlayer = plt.axes([0.10, 0.25, 0.30, 0.03], facecolor=axcolor)
+# axH2O = plt.axes([0.10, 0.20, 0.30, 0.03], facecolor=axcolor)
+# axCO2 = plt.axes([0.10, 0.15, 0.30, 0.03], facecolor=axcolor)
+# axCO = plt.axes([0.10, 0.10, 0.30, 0.03], facecolor=axcolor)
+# axCH4 = plt.axes([0.10, 0.05, 0.30, 0.03], facecolor=axcolor)
 
-### Slider values
-skappa = Slider(axkappa, 'kappa', -4, 2, valinit=-3 , valstep=0.1)
-sgamma = Slider(axgamma, 'gamma', -4, 1, valinit=-2, valstep=0.1)
-sf = Slider(axf, 'f', 0.0, 2.0, valinit=f0, valstep=0.01)
-sT_int = Slider(axT_int, 'T_int', 0., 1000.0, valinit=T_int0, valstep=1)
+# ### Slider values
+# skappa = Slider(axkappa, 'kappa', -4, 2, valinit=-3 , valstep=0.1)
+# sgamma = Slider(axgamma, 'gamma', -4, 1, valinit=-2, valstep=0.1)
+# sf = Slider(axf, 'f', 0.0, 2.0, valinit=f0, valstep=0.01)
+# sT_int = Slider(axT_int, 'T_int', 0., 1000.0, valinit=T_int0, valstep=1)
 
-sP_top = Slider(axP_top, 'P_top', -5 , -2, valinit=np.log10(P_top_init*1e-5),valstep=0.1)
-sP_deep = Slider(axP_deep, 'P_deep', -1 , 2, valinit=np.log10(P_deep_init*1e-5),valstep=0.1)
-sNlayer = Slider(axNlayer, 'Nlayer', 5, 200, valinit=NLAYER,valstep=1)
-sH2O = Slider(axH2O, 'H2O', -10, -1, valinit=H2O_init,valstep=0.1)
-sCO2 = Slider(axCO2, 'CO2', -10, -1, valinit=CO2_init,valstep=0.1)
-sCO = Slider(axCO, 'CO', -10, -1, valinit=CO_init,valstep=0.1)
-sCH4 = Slider(axCH4, 'CH4', -10, -1, valinit=CH4_init,valstep=0.1)
+# sP_top = Slider(axP_top, 'P_top', -5 , -2, valinit=np.log10(P_top_init*1e-5),valstep=0.1)
+# sP_deep = Slider(axP_deep, 'P_deep', -1 , 2, valinit=np.log10(P_deep_init*1e-5),valstep=0.1)
+# sNlayer = Slider(axNlayer, 'Nlayer', 5, 200, valinit=NLAYER,valstep=1)
+# sH2O = Slider(axH2O, 'H2O', -10, -1, valinit=H2O_init,valstep=0.1)
+# sCO2 = Slider(axCO2, 'CO2', -10, -1, valinit=CO2_init,valstep=0.1)
+# sCO = Slider(axCO, 'CO', -10, -1, valinit=CO_init,valstep=0.1)
+# sCH4 = Slider(axCH4, 'CH4', -10, -1, valinit=CH4_init,valstep=0.1)
 
-def update(val):
+# def update(val):
 
-    kappa = 10**skappa.val
-    gamma = 10**sgamma.val
-    f = sf.val
-    T_int = sT_int.val
+#     kappa = 10**skappa.val
+#     gamma = 10**sgamma.val
+#     f = sf.val
+#     T_int = sT_int.val
 
-    P_top = 10**sP_top.val*1e5
-    P_deep = 10**sP_deep.val*1e5
-    NLAYER = int(sNlayer.val)
-    H2O = 10**sH2O.val
-    CO2 = 10**sCO2.val
-    CO = 10**sCO.val
-    CH4 = 10**sCH4.val
+#     P_top = 10**sP_top.val*1e5
+#     P_deep = 10**sP_deep.val*1e5
+#     NLAYER = int(sNlayer.val)
+#     H2O = 10**sH2O.val
+#     CO2 = 10**sCO2.val
+#     CO = 10**sCO.val
+#     CH4 = 10**sCH4.val
 
-    P_model = gen_pressure(P_deep,P_top,NLAYER)
-    # print('P_model',P_model)
-    VMR_model = gen_vmr(NLAYER,H2O,CO2,CO,CH4)
-    # print('VMR_model',VMR_model)
-    T_model = TP_Guillot(P_model,g,T_eq,kappa,gamma,f,T_int)
-    # print('T_model',T_model)
-    spec = FM.calc_disc_spectrum_uniform(
-        3,P_model,T_model,VMR_model,
-        solspec=wasp43_spec)
-    line_spec.set_ydata(spec)
-    line_tp.set_data(T_model,P_model)
-    # print(spec)
-    fig.canvas.draw_idle()
+#     P_model = gen_pressure(P_deep,P_top,NLAYER)
+#     # print('P_model',P_model)
+#     VMR_model = gen_vmr(NLAYER,H2O,CO2,CO,CH4)
+#     # print('VMR_model',VMR_model)
+#     T_model = TP_Guillot(P_model,g,T_eq,kappa,gamma,f,T_int)
+#     # print('T_model',T_model)
+#     spec = FM.calc_disc_spectrum_uniform(
+#         3,P_model,T_model,VMR_model,
+#         solspec=wasp43_spec)
+#     line_spec.set_ydata(spec)
+#     line_tp.set_data(T_model,P_model)
+#     # print(spec)
+#     fig.canvas.draw_idle()
 
-skappa.on_changed(update)
-sgamma.on_changed(update)
-sf.on_changed(update)
-sT_int.on_changed(update)
-sP_top.on_changed(update)
-sP_deep.on_changed(update)
-sNlayer.on_changed(update)
-sH2O.on_changed(update)
-sCO2.on_changed(update)
-sCO.on_changed(update)
-sCH4.on_changed(update)
+# skappa.on_changed(update)
+# sgamma.on_changed(update)
+# sf.on_changed(update)
+# sT_int.on_changed(update)
+# sP_top.on_changed(update)
+# sP_deep.on_changed(update)
+# sNlayer.on_changed(update)
+# sH2O.on_changed(update)
+# sCO2.on_changed(update)
+# sCO.on_changed(update)
+# sCH4.on_changed(update)
 
 if __name__ == "__main__":
     plt.show()

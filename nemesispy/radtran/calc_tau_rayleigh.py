@@ -68,6 +68,10 @@ def calc_tau_rayleigh(wave_grid,U_layer,ISPACE=1):
     # Calculate the scattering cross sections in m2
     k_rayleighj = temp*faniso/(3.*(x**2)) #(NWAVE)
 
+    # C = 8.8e-28
+    # lam4 = wave_grid**4
+    # k_rayleighj = C / lam4
+
     # Calculate the Rayleigh opacities in each layer
     tau_rayleigh = np.zeros((len(wave_grid),NLAYER))
 

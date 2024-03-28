@@ -467,7 +467,8 @@ def average_transm(planet_radius, H_model, P_model, T_model, VMR_model, ID,
 
 
     return H_model,P_model,T_model,VMR_model,U_layer,dH,sf
-@jit(nopython=True)
+
+# @jit(nopython=True)
 def calc_layer(planet_radius, H_model, P_model, T_model, VMR_model, ID, NLAYER,
     path_angle, H_0=0.0, layer_type=1, custom_path_angle=0.0,
     custom_H_base=None, custom_P_base=None):

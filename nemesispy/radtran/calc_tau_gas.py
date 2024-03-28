@@ -80,6 +80,79 @@ def calc_tau_gas(k_gas_w_g_p_t, P_layer, T_layer, VMR_layer, U_layer,
 
     return tau_w_g_l
 
+@jit(nopython=True)
+def calc_tau_gas_comp(k_gas_w_g_p_t, P_layer, T_layer, VMR_layer, U_layer,
+    P_grid, T_grid, del_g, gas_index):
+    """
+    Parameters
+    ----------
+    k_gas_w_g_p_t(NGAS,NWAVE,NG,NPRESSK,NTEMPK) : ndarray
+        k-coefficients.
+        Unit: cm^2 (per particle)
+        Has dimension: NGAS x NWAVE x NG x NPRESSK x NTEMPK.
+    P_layer(NLAYER) : ndarray
+        Atmospheric pressure grid.
+        Unit: Pa
+    T_layer(NLAYER) : ndarray
+        Atmospheric temperature grid.
+        Unit: K
+    VMR_layer(NLAYER,NGAS) : ndarray
+        Array of volume mixing ratios for NGAS.
+        Has dimensioin: NLAYER x NGAS
+    U_layer(NLAYER) : ndarray
+        Total number of gas particles in each layer.
+        Unit: (no. of particle) m^-2
+    P_grid(NPRESSK) : ndarray
+        Pressure grid on which the k-coeff's are pre-computed.
+    T_grid(NTEMPK) : ndarray
+        Temperature grid on which the k-coeffs are pre-computed.
+    del_g(NG) : ndarray
+        Gauss quadrature weights for the g-ordinates.
+        These are the widths of the bins in g-space.
+    n_active : int
+        Number of spectrally active gases.
+
+    Returns
+    -------
+    tau_w_g_l(NWAVE,NG,NLAYER) : ndarray
+        Optical path due to spectral line absorptions.
+
+    Notes
+    -----
+    Absorber amounts (U_layer) is scaled down by a factor 1e-20 because Nemesis
+    k-tables are scaled up by a factor of 1e20.
+    """
+    # convert from per m^2 to per cm^2 and downscale Nemesis opacity by 1e-20
+    Scaled_U_layer = U_layer * 1.0e-20 * 1.0e-4
+    Ngas, Nwave, Ng = k_gas_w_g_p_t.shape[0:3]
+    Nlayer = len(P_layer)
+    tau_w_g_l = np.zeros((Nwave,Ng,Nlayer))
+
+    # if only has 1 active gas, skip random overlap
+    if Ngas == 1:
+        k_w_g_l = interp_k(P_grid, T_grid, P_layer, T_layer,
+            k_gas_w_g_p_t[0,:,:,:])
+        for ilayer in range(Nlayer):
+            tau_w_g_l[:,:,ilayer]  = k_w_g_l[:,:,ilayer] \
+                * Scaled_U_layer[ilayer] * VMR_layer[ilayer,0]
+
+    # if there are multiple gases, combine their opacities
+    else:
+        k_gas_w_g_l = np.zeros((Ngas,Nwave,Ng,Nlayer))
+
+        if gas_index >= 0:        # if negative then only continuum
+            k_gas_w_g_l[gas_index,:,:,:,] \
+                = interp_k(P_grid, T_grid, P_layer, T_layer,
+                    k_gas_w_g_p_t[gas_index,:,:,:,:])
+            for iwave in range (Nwave):
+                for ilayer in range(Nlayer):
+                    amount_layer = Scaled_U_layer[ilayer] * VMR_layer[ilayer,:Ngas]
+                    tau_w_g_l[iwave,:,ilayer]\
+                        = noverlapg(k_gas_w_g_l[:,iwave,:,ilayer],
+                            amount_layer,del_g)
+
+    return tau_w_g_l
+
 # fortran first number in multi d array cycles fastest, python last number fastest
 # row major or column major, try it
 # python left one is outside loop

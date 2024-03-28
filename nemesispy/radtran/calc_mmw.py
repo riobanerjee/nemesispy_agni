@@ -35,7 +35,7 @@ def calc_mmw(ID, VMR, ISO=[]):
     -----
     Cf mol_id.py and mol_info.py.
     """
-    mmw = 0
+    mmw = 0.0
     if len(ISO) == 0:
         for gas_index in range(len(ID)):
             mmw += mol_info['{}'.format(ID[gas_index])]['mmw']*VMR[gas_index]
