@@ -140,16 +140,31 @@ def calc_tau_gas_comp(k_gas_w_g_p_t, P_layer, T_layer, VMR_layer, U_layer,
     else:
         k_gas_w_g_l = np.zeros((Ngas,Nwave,Ng,Nlayer))
 
-        if gas_index >= 0:        # if negative then only continuum
-            k_gas_w_g_l[gas_index,:,:,:,] \
-                = interp_k(P_grid, T_grid, P_layer, T_layer,
-                    k_gas_w_g_p_t[gas_index,:,:,:,:])
-            for iwave in range (Nwave):
-                for ilayer in range(Nlayer):
-                    amount_layer = Scaled_U_layer[ilayer] * VMR_layer[ilayer,:Ngas]
-                    tau_w_g_l[iwave,:,ilayer]\
-                        = noverlapg(k_gas_w_g_l[:,iwave,:,ilayer],
-                            amount_layer,del_g)
+        if gas_index[0] < 0: # all but this (so exclude this)
+            for igas in range(Ngas):
+                # if np.where(vec == val)[0].shape[0] > 0:
+                for gi in range(len(gas_index)):
+                    gi_exclude = gas_index[gi]
+                    if igas != -gi_exclude:
+                        k_gas_w_g_l[igas,:,:,:,] \
+                            = interp_k(P_grid, T_grid, P_layer, T_layer,
+                                k_gas_w_g_p_t[igas,:,:,:,:])
+
+        else:
+            for igas in range(Ngas):
+                for gi in range(len(gas_index)):
+                    gi_include = gas_index[gi]
+                    if igas == gi_include:
+                        k_gas_w_g_l[igas,:,:,:,] \
+                            = interp_k(P_grid, T_grid, P_layer, T_layer,
+                                k_gas_w_g_p_t[igas,:,:,:,:])
+            
+        for iwave in range (Nwave):
+            for ilayer in range(Nlayer):
+                amount_layer = Scaled_U_layer[ilayer] * VMR_layer[ilayer,:Ngas]
+                tau_w_g_l[iwave,:,ilayer]\
+                    = noverlapg(k_gas_w_g_l[:,iwave,:,ilayer],
+                        amount_layer,del_g)
 
     return tau_w_g_l
 

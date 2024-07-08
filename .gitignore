@@ -5,7 +5,7 @@ __pycache__/
 
 # C extensions
 *.so
-
+*.kta
 # Distribution / packaging
 .Python
 build/

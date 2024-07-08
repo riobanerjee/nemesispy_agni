@@ -36,7 +36,36 @@ def calc_grav_simple(h, M_plt, R_plt):
     return g
 
 @jit(nopython=True)
-def calc_hydrostat(P, T, mmw, M_plt, R_plt, H=np.array([])):
+def calc_grav_spinny(h, M_plt, R_plt, P_plt):
+    """
+    Calculates the gravitational acceleration at altitude h on a planet.
+
+    Parameters
+    ----------
+    h : real
+        Altitude.
+        Unit: m
+    M_plt : real
+        Planet mass.
+        Unit: kg
+    R_plt : real
+        Planet radius.
+        Unit: m
+    P_plt : real
+        Planet period.
+        Unit: s
+
+    Returns
+    -------
+    g : real
+        Gravitational acceleration.
+        Unit: ms^-2
+    """
+    g = G*M_plt/((R_plt+h)**2) - 0.5*((2*np.pi/P_plt)**2 * (R_plt+h))
+    return g
+
+@jit(nopython=True)
+def calc_hydrostat(P, T, mmw, M_plt, R_plt, H=np.array([]), spin=False, P_plt=None):
     """
     Calculates an altitude profile from given pressure, temperature and
     mean molecular weight profiles assuming hydrostatic equilibrium.
@@ -92,6 +121,9 @@ def calc_hydrostat(P, T, mmw, M_plt, R_plt, H=np.array([])):
         # Calculate the atmospheric model depth
         atdepth = dummy_H[-1] - dummy_H[0]
         # Calculate the gravity at each altitude level
+        # if spin:
+        #     gravity =  calc_grav_spinny(h=dummy_H, M_plt=M_plt, R_plt=R_plt, P_plt=P_plt)
+        # else:
         gravity =  calc_grav_simple(h=dummy_H, M_plt=M_plt, R_plt=R_plt)
         # Calculate the scale height
         scale = K_B*T/(mmw*gravity)
@@ -113,6 +145,74 @@ def calc_hydrostat(P, T, mmw, M_plt, R_plt, H=np.array([])):
         adjusted_H = np.copy(dummy_H)
 
     return adjusted_H
+
+# @jit(nopython=True)
+def calc_hydrostat_alt(H, T, mmw, M_plt, R_plt, P=np.array([])):
+    """
+    Calculates a pressure profile from given altitude, temperature and
+    mean molecular weight profiles assuming hydrostatic equilibrium.
+
+
+    Parameters
+    ----------
+    P : ndarray
+        Pressure profile
+        Unit: Pa
+    T : ndarray
+        Temperature profile
+        Unit: K
+    mmw : ndarray
+        Mean molecular weight profile
+        Unit: kg
+    M_plt : real
+        Planetary mass
+        Unit: kg
+    R_plt : real
+        Planetary radius
+        Unit: m
+    H : ndarray
+        Altitude profile to be adjusted
+        Unit: m
+
+    Returns
+    -------
+    adjusted_H : ndarray
+        Altitude profile satisfying hydrostatic equlibrium.
+        Unit: m
+
+    """
+    ## ASSUMING 1e6 Pa is base pressure
+    
+    # Note number of profile points and set up a temporary height profile
+    NPRO = len(H)
+    if len(P)==0:
+        P = np.logspace(6, -4, NPRO)
+
+    # First find level closest ot zero altitude
+    i_p = (np.abs(P - 1e6)).argmin()
+    p0 = P[i_p]
+    if ( (p0>0.0) & (i_p>0)):
+        i_p = i_p -1
+
+    # Calculate the gravity at each altitude level
+    gravity =  calc_grav_simple(h=H, M_plt=M_plt, R_plt=R_plt)
+    # Calculate the scale height
+    scale = K_B*T/(mmw*gravity)
+    adjusted_P = np.copy(P)
+
+    if i_p > 0 and i_p < NPRO-1 :
+        adjusted_P[i_p] = 1e6
+
+    # nupper = NPRO - ialt - 1
+    for i in range(i_p+1, NPRO):
+        sh = 0.5 * (scale[i-1] + scale[i])
+        adjusted_P[i] = adjusted_P[i-1] * np.exp(-(H[i] - H[i-1])/sh)
+
+    for i in range(i_p-1,-1,-1):
+        sh = 0.5 * (scale[i+1] + scale[i])
+        adjusted_P[i] = adjusted_P[i+1] * np.exp(-(H[i] - H[i-1])/sh)
+
+    return adjusted_P
 
 # @jit(nopython=True)
 def calc_hydrostat_guillot(P, T, mmw, M_plt, R_plt, H=np.array([])):

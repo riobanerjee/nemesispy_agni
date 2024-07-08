@@ -7,7 +7,7 @@ from numba import jit
 import numpy as np
 
 @jit(nopython=True)
-def calc_tau_rayleigh(wave_grid,U_layer,ISPACE=1):
+def calc_tau_rayleigh(wave_grid,U_layer,ISPACE=1,fH2=None):
     """
     Calculate the Rayleigh scattering optical depth for Gas Giant atmospheres
     using data from Allen (1976) Astrophysical Quantities.
@@ -33,10 +33,11 @@ def calc_tau_rayleigh(wave_grid,U_layer,ISPACE=1):
     BH2 = 7.52E-3
     AHe = 3.48E-5
     BHe = 2.30E-3
-    fH2 = 0.864
     k = 1.37971e-23 # JK-1
     P0 = 1.01325e5 # Pa
     T0 = 273.15 # K
+    if fH2 is None:
+        fH2 = 0.864
 
     NLAYER = len(U_layer)
     NWAVE = len(wave_grid)
