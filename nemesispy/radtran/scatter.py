@@ -523,63 +523,32 @@ def kk_new_sub(vi, k, vm, nm):
 
 
 @njit(parallel=False, cache = os.environ.get("USE_NUMBA_CACHE")=='True', error_model='numpy')
-def makephase(wave_grid, iscat, dsize, rs, nimag_wave_grid, calc_wave_grid,
-              nreal_ref, nimag, refwave, normwave,downscaling, iwave=1):
+def makephase(wave_grid, iscat, dsize, rs, nimag_wave_grid,
+              nreal_ref, nimag, refwave, ispace=1):
     nwave = len(wave_grid)
     data_arr = np.zeros((nwave, 6))
     max_theta = 100
     theta, ntheta, nphase = get_theta(max_theta)
     nreal = kk_new_sub(nimag_wave_grid,nimag,refwave[0],nreal_ref[0])
-    refindx_real = np.interp(wave_grid, nimag_wave_grid, nreal)
-    refindx_imag = np.interp(wave_grid, nimag_wave_grid, nimag)
-
-    refindx_interp = np.zeros((len(wave_grid),2))
-    refindx_interp[:,0] = refindx_real
-    refindx_interp[:,1] = refindx_imag
-    if downscaling > 0:
-        for j in prange(0,nwave,downscaling):
-            w = wave_grid[j]
-            if iwave == 1:
-                xlam = w
-            else:
-                xlam = 10000.0 / w
-            xscat, xext, phase = miescat(xlam, iscat, dsize[None,:], 1, rs, refindx_interp[j], theta[:ntheta], ntheta, nphase)
-            omega = xscat / xext
-            f, g1, g2, rms = subfithgm(nphase, theta, phase)
-            data_arr[j, 0] = xext
-            data_arr[j, 1] = xscat
-            data_arr[j, 2] = f
-            data_arr[j, 3] = g1
-            data_arr[j, 4] = g2
-            data_arr[j, 5] = rms
-            
-    elif downscaling == 0:
-        for j in prange(len(calc_wave_grid)):
-            w = calc_wave_grid[j]
-            if iwave == 1:
-                xlam = w
-            else:
-                xlam = 10000.0 / w
-            xscat, xext, phase = miescat(xlam, iscat, dsize[None,:], 1, rs, 
-                                         np.array([nreal[j%len(nimag_wave_grid)],
-                                                   nimag[j%len(nimag_wave_grid)]]), theta[:ntheta], ntheta, nphase)
-            omega = xscat / xext
-            f, g1, g2, rms = subfithgm(nphase, theta, phase)
-            data_arr[j, 0] = xext
-            data_arr[j, 1] = xscat
-            data_arr[j, 2] = f
-            data_arr[j, 3] = g1
-            data_arr[j, 4] = g2
-            data_arr[j, 5] = rms
-
-#     # Calculating normalising xext - should integrate this with the loop
-#     refindx_real = np.interp(normwave[0], nimag_wave_grid, nreal)
-#     refindx_imag = np.interp(normwave[0], nimag_wave_grid, nimag)
-#     refindx_interp = np.zeros((1,2))
-#     refindx_interp[:,0] = refindx_real
-#     refindx_interp[:,1] = refindx_imag
     
-#     _, xextnorm, _ = miescat(normwave[0], iscat, dsize[None,:], 1, rs, refindx_interp[0], theta[:ntheta], ntheta, nphase)
+    for j in range(len(nimag_wave_grid)):
+        w = nimag_wave_grid[j]
+        if ispace == 1:
+            xlam = w
+        else:
+            xlam = 10000.0 / w
+        xscat, xext, phase = miescat(xlam, iscat, dsize[None,:], 1, rs, 
+                                     np.array([nreal[j],
+                                               nimag[j]]), theta[:ntheta], ntheta, nphase)
+        omega = xscat / xext
+        f, g1, g2, rms = subfithgm(nphase, theta, phase)
+        data_arr[j, 0] = xext
+        data_arr[j, 1] = xscat
+        data_arr[j, 2] = f
+        data_arr[j, 3] = g1
+        data_arr[j, 4] = g2
+        data_arr[j, 5] = rms
+
     return data_arr
 
 
@@ -1124,33 +1093,33 @@ def scloud11wave(phasarr, radg, sol_ang, emiss_ang, solar, aphi, lowbc, galb, mu
             pmir*=0
             
             for j1 in range(ncont):
-                if imie == 0:
-                    f, g1, g2 = phasarr[j1, widx, :, 0]  
-                    iscat = 2
-                    ncons = 3
-                    cons8 = np.array([f, g1, g2])
-                    norm = 1
-                    pfunc = cons8
-                    xmu = cons8
+#                 if imie == 0:
+                f, g1, g2 = phasarr[j1, widx, 2:5]  
+                iscat = 2
+                ncons = 3
+                cons8 = np.array([f, g1, g2])
+                norm = 1
+                pfunc = cons8
+                xmu = cons8
+
+                pplpl, pplmi, fc[j1] = calc_pmat6(ic, mu, wtmu, nmu, iscat, cons8, ncons, 
+                                          norm, j1, ncont, vwave, nphi, fc[j1], pfunc, xmu)
+                # Transfer matrices to those for each scattering particle
+                ppln[j1] = pplpl
+                pmin[j1] = pplmi
                     
-                    pplpl, pplmi, fc[j1] = calc_pmat6(ic, mu, wtmu, nmu, iscat, cons8, ncons, 
-                                              norm, j1, ncont, vwave, nphi, fc[j1], pfunc, xmu)
-                    # Transfer matrices to those for each scattering particle
-                    ppln[j1] = pplpl
-                    pmin[j1] = pplmi
-                    
-                else:
-                    pfunc = phasarr[j1, widx, 0, :]
-                    xmu   = phasarr[j1, widx, 1, :]
-                    iscat = 4
-                    ncons = 0
-                    cons8 = pfunc
-                    norm = 1
-                    pplpl, pplmi, fc[j1] = calc_pmat6(ic, mu, wtmu, nmu, iscat, cons8, ncons, 
-                                              norm, j1, ncont, vwave, nphi, fc[j1], pfunc, xmu)
-                    # Transfer matrices to those for each scattering particle
-                    ppln[j1] = pplpl
-                    pmin[j1] = pplmi
+#                 else:
+#                     pfunc = phasarr[j1, widx, 0, :]
+#                     xmu   = phasarr[j1, widx, 1, :]
+#                     iscat = 4
+#                     ncons = 0
+#                     cons8 = pfunc
+#                     norm = 1
+#                     pplpl, pplmi, fc[j1] = calc_pmat6(ic, mu, wtmu, nmu, iscat, cons8, ncons, 
+#                                               norm, j1, ncont, vwave, nphi, fc[j1], pfunc, xmu)
+#                     # Transfer matrices to those for each scattering particle
+#                     ppln[j1] = pplpl
+#                     pmin[j1] = pplmi
                 
                 
             if iray > 0:

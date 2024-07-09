@@ -15,6 +15,7 @@ from nemesispy.radtran.read import read_cia
 from nemesispy.radtran.calc_layer import calc_layer
 from nemesispy.radtran.calc_layer import calc_layer_transm, calc_layer_transm_dual
 from nemesispy.common.calc_trig import gauss_lobatto_weights
+from nemesispy.common.constants import AMU,N_A
 from nemesispy.common.interpolate_gcm import interp_gcm
 from nemesispy.common.calc_hydrostat import calc_hydrostat, calc_hydrostat_alt, calc_hydrostat_pref_test
 from nemesispy.radtran.calc_radiance import calc_weighting
@@ -201,32 +202,39 @@ class ForwardModel():
         return weighting_function
 
     def calc_point_spectrum(self, H_model, P_model, T_model, VMR_model, Ptop,
-        path_angle, solspec=[], A_model=[]):
+        angles = np.array([0.,0.,0.]), solspec=[], A_model=None):
         """
         Calculate average layer properties from model inputs,
         then compute the spectrum at a single point on the disc.
         """
+        path_angle = angles[1]
+        
+        NPRO = len(P_model)
+        mmw = np.zeros(P_model.shape)
+        for ipro in range(NPRO):
+            mmw[ipro] = calc_mmw(self.gas_id_list,VMR_model[ipro,:])
+        
+        for imode in range(A_model.shape[1]):
+            A_model[:,imode] = A_model[:,imode] * mmw / N_A / AMU * 1e-4
+        
+        
         H_layer,P_layer,T_layer,VMR_layer,U_layer,A_layer,dH,scale \
             = calc_layer(
             self.R_plt, H_model, P_model, T_model, VMR_model,
             self.gas_id_list, self.NLAYER, path_angle, layer_type=1,
             H_0=0.0, A_model=A_model
             )
-        NPRO = len(P_model)
-        mmw = np.zeros(P_model.shape)
-        for ipro in range(NPRO):
-            mmw[ipro] = calc_mmw(self.gas_id_list,VMR_model[ipro,:])
+
         
         if len(solspec)==0:
             solspec = np.ones(len(self.wave_grid))
-
+            
         point_spectrum = calc_radiance(self.wave_grid, U_layer, P_layer, T_layer,
             VMR_layer, mmw, Ptop, self.k_gas_w_g_p_t, self.k_table_P_grid,
             self.k_table_T_grid, self.del_g, ScalingFactor=scale,
             R_plt=self.R_plt, solspec=solspec, k_cia=self.k_cia_pair_t_w,
             ID=self.gas_id_list,cia_nu_grid=self.cia_nu_grid,
-            cia_T_grid=self.cia_T_grid, dH=dH, A_layer=A_layer, phase_func=self.phase_func)
-
+            cia_T_grid=self.cia_T_grid, dH=dH, A_layer=A_layer, phase_func=self.phase_func, angles=angles)
         return point_spectrum
     
     def calc_transm_spectrum(self, P_model, T_model, VMR_model,
@@ -435,7 +443,7 @@ class ForwardModel():
         return contribs, P_layer
 
     def calc_point_spectrum_hydro(self, P_model, T_model, VMR_model, Ptop=None,
-        path_angle=0, solspec=[]):
+        angles=np.array([0.,0.,0.]), solspec=[], A_model=None):
         """
         Use the hydrodynamic equation to calculate layer height
         First get layer properties from model inputs
@@ -451,7 +459,7 @@ class ForwardModel():
             M_plt=self.M_plt, R_plt=self.R_plt)
 
         point_spectrum = self.calc_point_spectrum(H_model, P_model,
-            T_model, VMR_model, Ptop, path_angle, solspec)
+            T_model, VMR_model, Ptop, angles, solspec, A_model=A_model)
 
         return point_spectrum
 
@@ -509,102 +517,121 @@ class ForwardModel():
         return disc_spectrum
 
     def calc_disc_spectrum_uniform(self, nmu, P_model, T_model, VMR_model,
-        H_model=[],solspec=[], A_model=[]):
+        H_model=[],solspec=[], A_model=None):
         """Caculate the disc integrated spectrum of a homogeneous atmosphere
         A_Model = Aerosol
         """
         # initialise output array
         disc_spectrum = np.zeros(len(self.wave_grid))
         nav, wav = gauss_lobatto_weights(0, nmu)
+        
+        fov_sol_angles = wav[2,:]
         fov_emission_angles = wav[3,:]
+        fov_azimuth_angles = wav[4,:]
         fov_weights = wav[5,:]
 
         # Hydrostatic case
         if len(H_model) == 0:
             for iav in range(nav):
+                sol_angle = fov_sol_angles[iav]
                 path_angle = fov_emission_angles[iav]
+                azi_angle = fov_azimuth_angles[iav]
+                
+                angles = np.array([sol_angle,path_angle,azi_angle])
+                
                 weight = fov_weights[iav]
                 point_spectrum = self.calc_point_spectrum_hydro(
-                    P_model, T_model, VMR_model, path_angle,
+                    P_model, T_model, VMR_model, angles,
                     solspec=solspec, A_model=A_model)
                 disc_spectrum += point_spectrum * weight
         else:
             for iav in range(nav):
+                sol_angle = fov_sol_angles[iav]
                 path_angle = fov_emission_angles[iav]
+                azi_angle = fov_azimuth_angles[iav]
+                
+                angles = np.array([sol_angle,path_angle,azi_angle])
+                
                 weight = fov_weights[iav]
                 point_spectrum = self.calc_point_spectrum(
-                    H_model, P_model, T_model, VMR_model, path_angle,
+                    H_model, P_model, T_model, VMR_model, angles,
                     solspec=solspec, A_model=A_model)
                 disc_spectrum += point_spectrum * weight
         return disc_spectrum
     
 
-def calc_phase_function(self, mean_size, size_variance, n_imag, n_imag_wave_grid, n_real_reference,
-               n_real_reference_wave = None, normalising_wave = None, ispace=1):
-    
-    """
-    Calculates extinction and scattering cross-sections, along with fitted phase function parameters,
-    for an aerosol species with defined properties, assuming a standard gamma distribution.
-    
-    Parameters
-    ----------
-    wave_grid(NWAVE) : ndarray
-        Wavelengths (um) grid for calculating parameters.
-    mean_size : float
-        Mean size of the particles
-    size_variance : float
-        Size variance of the particles
-    n_imag(NWAVEIMAG) : ndarray
-        Grid of imaginary refractive indices
-    n_imag_wave_grid(NWAVEIMAG) : ndarray
-        Grid of wavelengths that n_imag lies on
-    n_real_reference : float
-        Reference real refractive index
-    n_real_reference_wave : float
-        Wavelength that the n_real_reference corresponds to. Defaults to wave_grid[0]
-    normalising_wave : float
-        Wavelength that the cross-sections should be normalised at. Defaults to wave_grid[0]
-        
-    Returns
-    ---------
-    phase_func(1,NWAVE,6) : ndarray
-        Contains the cross sections and phase function parameters for use with multiple scattering.
-        
-    """
-    wave_grid = self.wave_grid
-    
-    if n_real_reference_wave is None:
-        n_real_reference_wave = wave_grid[0]
-    if normalising_wave is None:
-        normalising_wave = wave_grid[0]      
-    
-    # Assuming iscat = 1 (standard gamma)
-    size_distribution_parameters = np.array([mean_size,size_variance,(1-3*size_variance)/size_variance])
-    
-    size_integration_bounds = np.array([0.015*np.min(n_imag_wave_grid), 0.0, 0.015*np.min(n_imag_wave_grid)]) 
-    
-    phase_func = makephase(wave_grid = wave_grid,
-                         iscat = 1,
-                         dsize = size_distribution_parameters,
-                         rs = size_integration_bounds,
-                         nimag_wave_grid = n_imag_wave_grid,
-                         nreal_ref = n_real_reference,
-                         nimag = n_imag,
-                         refwave = n_real_reference_wave,
-                         ispace = ispace)[None,:]
-    
-    spline = CubicSpline(n_imag_wave_grid, 
-                          phase_func[0,:, :2], 
-                          axis=0)
+    def set_phase_function(self, mean_size, size_variance, n_imag, n_imag_wave_grid, n_real_reference,
+                   n_real_reference_wave = None, normalising_wave = None, ispace=1):
 
-    phase_func[0,:, :2] = spline(wave_grid)
-    xext_norm = spline(normalising_wave)[0]
+        """
+        Calculates extinction and scattering cross-sections, along with fitted phase function parameters,
+        for an aerosol species with defined properties, assuming a standard gamma distribution.
 
-    phase_func[0,:, :2] = phase_func[0,:, :2] / xext_norm
-    
-    
-    for iphas in range(2,5):
-        phase_func[0,:, iphas] = np.interp(wave_grid,n_imag_wave_grid,\
-                                           phase_func[0,:, iphas])
-    self.phase_func = phase_func
+        Parameters
+        ----------
+        wave_grid(NWAVE) : ndarray
+            Wavelengths (um) grid for calculating parameters.
+        mean_size : float
+            Mean size of the particles
+        size_variance : float
+            Size variance of the particles
+        n_imag(NWAVEIMAG) : ndarray
+            Grid of imaginary refractive indices
+        n_imag_wave_grid(NWAVEIMAG) : ndarray
+            Grid of wavelengths that n_imag lies on
+        n_real_reference : float
+            Reference real refractive index
+        n_real_reference_wave : float
+            Wavelength that the n_real_reference corresponds to. Defaults to wave_grid[0]
+        normalising_wave : float
+            Wavelength that the cross-sections should be normalised at. Defaults to wave_grid[0]
+
+        Returns
+        ---------
+        phase_func(1,NWAVE,6) : ndarray
+            Contains the cross sections and phase function parameters for use with multiple scattering.
+
+        """
+        wave_grid = self.wave_grid
+
+        phase_func = np.zeros((1,len(wave_grid),6))
         
+        if n_real_reference_wave is None:
+            n_real_reference_wave = wave_grid[0]
+        if normalising_wave is None:
+            normalising_wave = wave_grid[0]      
+
+        n_real_reference_wave = np.array([n_real_reference_wave]) #placeholders before adding multiple modes
+        normalising_wave = np.array([normalising_wave])
+        
+            
+        # Assuming iscat = 1 (standard gamma)
+        size_distribution_parameters = np.array([mean_size,size_variance,(1-3*size_variance)/size_variance])
+
+        size_integration_bounds = np.array([0.015*np.min(n_imag_wave_grid), 0.0, 0.015*np.min(n_imag_wave_grid)]) 
+
+        small_phase_func = makephase(wave_grid = n_imag_wave_grid,
+                             iscat = np.array([1]),
+                             dsize = size_distribution_parameters,
+                             rs = size_integration_bounds,
+                             nimag_wave_grid = n_imag_wave_grid,
+                             nreal_ref = np.array([n_real_reference]),
+                             nimag = n_imag,
+                             refwave = n_real_reference_wave,
+                             ispace = ispace)[None,:]
+    
+    
+        spline = CubicSpline(n_imag_wave_grid, 
+                              small_phase_func[0,:, :], 
+                              axis=0)
+
+        phase_func[0,:, :] = spline(wave_grid)
+        xext_norm = spline(normalising_wave)[0][0]
+
+        phase_func[0,:, :2] = phase_func[0,:, :2] / xext_norm
+
+
+#         for iphas in range(2,5):
+#             phase_func[0,:, iphas] = np.interp(wave_grid,n_imag_wave_grid,\
+#                                                small_phase_func[0,:, iphas])
+        self.phase_func = phase_func

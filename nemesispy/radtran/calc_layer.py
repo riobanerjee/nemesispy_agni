@@ -166,7 +166,7 @@ def simps(y,x):
 
 @jit(nopython=True)
 def average(planet_radius, H_model, P_model, T_model, VMR_model, ID, H_base,
-        path_angle, H_0=0.0, A_model=[]):
+        path_angle, H_0=0.0, A_model=None):
     """
     Calculates absorber-amount-weighted average layer properties of an
     atmosphere.
@@ -262,12 +262,16 @@ def average(planet_radius, H_model, P_model, T_model, VMR_model, ID, H_base,
 
     # initiate output arrays
     Ngas = len(VMR_model[0])
-    NMODES = len(A_model[0])
     H_layer = np.zeros(NLAYER) # average layer height
     P_layer = np.zeros(NLAYER) # average layer pressure
     T_layer = np.zeros(NLAYER) # average layer temperature
     U_layer = np.zeros(NLAYER) # total no. of gas molecules per unit aera
     VMR_layer = np.zeros((NLAYER, Ngas)) # partial pressures
+    
+    if A_model is None:
+        A_model = np.zeros((len(P_model),1))
+        
+    NMODES = len(A_model[0])
     A_layer = np.zeros((NLAYER, NMODES)) # aerosol model
 
     # Calculate average properties depending on intergration type
@@ -305,7 +309,6 @@ def average(planet_radius, H_model, P_model, T_model, VMR_model, ID, H_base,
     # Scale back to vertical layers
     for ilayer in range(NLAYER):
         U_layer[ilayer] = U_layer[ilayer]/scale[ilayer]
-
     return H_layer,P_layer,T_layer,VMR_layer,U_layer,A_layer,dH,scale
 
 
@@ -655,10 +658,10 @@ def average_transm_dual(planet_radius, H_model, P_model, P_model_n, T_model, T_m
     return H_model,P_model,T_model,VMR_model,U_layer, U_layer_n,dH,sf
 
 
-@jit(nopython=True)
+# @jit(nopython=True)
 def calc_layer(planet_radius, H_model, P_model, T_model, VMR_model, ID, NLAYER,
     path_angle, H_0=0.0, layer_type=1, custom_path_angle=0.0,
-    custom_H_base=None, custom_P_base=None, A_model=[]):
+    custom_H_base=None, custom_P_base=None, A_model=None):
     """
     Top level routine that calculates the layer properties from an atmospehric
     model.
@@ -682,7 +685,7 @@ def calc_layer(planet_radius, H_model, P_model, T_model, VMR_model, ID, NLAYER,
             VMR_model, ID, H_base, path_angle=path_angle,
             H_0=H_0, A_model=A_model)
     
-    return H_layer,P_layer,T_layer,VMR_layer,U_layer,dH,scale
+    return H_layer,P_layer,T_layer,VMR_layer,U_layer,A_layer,dH,scale
 
 # @jit(nopython=True)
 def calc_layer_transm(planet_radius, H_model, P_model, T_model, VMR_model, ID, NLAYER,

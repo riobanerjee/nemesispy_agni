@@ -514,9 +514,9 @@ def calc_contrib(wave_grid, H_layer, H_base, U_layer, P_layer,P_base, T_layer, V
 
 
 @jit(nopython=True)
-def calc_radiance(wave_grid, U_layer, P_layer, T_layer, VMR_layer,
+def calc_radiance(wave_grid, U_layer, P_layer, T_layer, VMR_layer,mmw, Ptop,
     k_gas_w_g_p_t, P_grid, T_grid, del_g, ScalingFactor, R_plt, solspec,
-    k_cia, ID, cia_nu_grid, cia_T_grid, dH, path_angle, A_layer, phase_func):
+    k_cia, ID, cia_nu_grid, cia_T_grid, dH, A_layer, phase_func, angles):
     """
     Calculate emission spectrum using the correlated-k method.
 
@@ -584,6 +584,9 @@ def calc_radiance(wave_grid, U_layer, P_layer, T_layer, VMR_layer,
     NLAYER = len(P_layer)
     NMODE = A_layer.shape[1]
         
+    if phase_func is None:
+        phase_func = np.zeros((NMODE,NWAVE,6))
+        
     # Initiate arrays to record total optical paths
     tau_total_w_g_l = np.zeros((NWAVE,NG,NLAYER))
     omegas = np.zeros((NWAVE,NG,NLAYER))
@@ -597,7 +600,12 @@ def calc_radiance(wave_grid, U_layer, P_layer, T_layer, VMR_layer,
     tau_rayleigh = calc_tau_rayleigh(wave_grid=wave_grid,U_layer=U_layer)
 
     # Dust scattering optical path (NWAVE x NLAYER)
-    tau_dust_ext, tau_dust_scat, lfrac = calc_tau_dust(A_layer, phase_func)
+    if phase_func is not None:
+        tau_dust_ext, tau_dust_scat, lfrac = calc_tau_dust(A_layer, phase_func)
+    else:
+        tau_dust_ext = np.zeros((NWAVE,NLAYER))
+        tau_dust_scat = np.zeros((NWAVE,NLAYER))
+        lfrac = np.zeros((NWAVE,NMODE, NLAYER)) 
                     
     # FORTRAN straight transcript
     tau_gas = calc_tau_gas(k_gas_w_g_p_t, P_layer, T_layer, VMR_layer, U_layer,
@@ -654,19 +662,26 @@ def calc_radiance(wave_grid, U_layer, P_layer, T_layer, VMR_layer,
             spec_w_g[:,ig] = spec_w_g[:,ig] \
                 + tr_old_w_g[:,ig] * radground[:] * xfac[:]
 
-        # Integrate over g-ordinates
-        spectrum = np.zeros((NWAVE))
-        for iwave in range(NWAVE):
-            for ig in range(NG):
-                spectrum[iwave] += spec_w_g[iwave,ig] * del_g[ig]
+
 
     else:
+        radground = calc_planck(wave_grid,T_layer[-1]) * np.ones((5,NWAVE))
+        planck = np.zeros((NWAVE,NLAYER))
+        for ilayer in range(NLAYER):
+            planck[:,ilayer] = calc_planck(wave_grid,T_layer[ilayer])
+
+        
+        
         for ig in range(NG):
             
-            spec_w_g[:,ig] = calc_spectrum_scloud11(wave_grid, phase_func,T_layer,solspec,
+            spec_w_g[:,ig] = calc_spectrum_scloud11(wave_grid, phase_func,radground,solspec,
                                                     tau_total_w_g_l[:,ig],tau_rayleigh,
-                                                    omegas[:,ig],lfrac, path_angle)
-    
+                                                    omegas[:,ig],lfrac,planck,angles) * xfac
+    # Integrate over g-ordinates
+    spectrum = np.zeros((NWAVE))
+    for iwave in range(NWAVE):
+        for ig in range(NG):
+            spectrum[iwave] += spec_w_g[iwave,ig] * del_g[ig]
     return spectrum
 
 
