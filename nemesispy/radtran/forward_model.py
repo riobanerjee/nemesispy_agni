@@ -612,17 +612,22 @@ class ForwardModel():
         n_real_reference_wave = np.array([n_real_reference_wave])
         normalising_wave = np.array([normalising_wave])
         
-        size_distribution_parameters = np.array([mean_size,size_variance,(1-3*size_variance)/size_variance])
-        
         
         # iscat = 1,2,4 implemented (gamma, log-normal, single particle size) 
-        if iscat not in [1,2,4]:
+        if iscat == 1:
+            size_distribution_parameters = np.array([mean_size,size_variance,(1-3*size_variance)/size_variance])
+            size_integration_bounds = np.array([0.015*np.min(n_imag_wave_grid), 0.0, 0.015*np.min(n_imag_wave_grid)]) 
+        elif iscat == 2:
+            size_distribution_parameters = np.array([mean_size,size_variance])
+            size_integration_bounds = np.array([0.015*np.min(n_imag_wave_grid), 0.0, 0.015*np.min(n_imag_wave_grid)]) 
+        elif iscat == 4:
+            size_distribution_parameters = np.array([mean_size,0,0])
+            size_integration_bounds = np.array([mean_size,mean_size,mean_size]) 
+            
+        else:
             print(f'ISCAT={iscat} NOT IMPLEMENTED')
             return
-        
-        
             
-        size_integration_bounds = np.array([0.015*np.min(n_imag_wave_grid), 0.0, 0.015*np.min(n_imag_wave_grid)]) 
 
         small_phase_func = makephase(wave_grid = n_imag_wave_grid,
                              iscat = np.array([iscat]),

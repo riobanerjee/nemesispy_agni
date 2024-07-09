@@ -65,7 +65,6 @@ def miescat(xlam, iscat, dsize, nmode, rs, refindx, theta, ntheta, nphas):
                 cc = 0.0
                 if iscat[0] == 0: # continuous
                     rmax[0] = rs[1]
-
                 if iscat[m] == 1:
                     alpha = dsize[m][2]
                     rmax[m] = alpha * aa * bb
@@ -85,6 +84,7 @@ def miescat(xlam, iscat, dsize, nmode, rs, refindx, theta, ntheta, nphas):
     anorm = 0.0
     rfr = refindx[0]
     rfi = refindx[1]
+    
     for m in range(inr):
 #     while True:
         rr = r1 + m * delr
@@ -118,11 +118,13 @@ def miescat(xlam, iscat, dsize, nmode, rs, refindx, theta, ntheta, nphas):
                     anr1 = rr ** aa * np.exp(-bb * rr ** cc)
                 else:
                     anr1 = np.sqrt(2 * pi) / (rr * bb) * np.exp(-0.5 * ((np.log(rr) - np.log(aa)) / bb) ** 2)
-                anr += anr1
-                nqmax[mo - 1] = max(nqmax[mo - 1], anr1 * qscat)
-                if not cont:
-                    if rr < rmax[mo - 1] or anr1 * qscat > 1e-06 * nqmax[mo - 1]:
-                        cont = True
+            else:
+                anr1 = 1.0
+            anr += anr1
+            nqmax[mo - 1] = max(nqmax[mo - 1], anr1 * qscat)
+            if not cont:
+                if rr < rmax[mo - 1] or anr1 * qscat > 1e-06 * nqmax[mo - 1]:
+                    cont = True
 
         if m % 2 == 0:
             vv = 2.0 * delr / 3.0
