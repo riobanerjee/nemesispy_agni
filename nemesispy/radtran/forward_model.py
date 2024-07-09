@@ -215,6 +215,11 @@ class ForwardModel():
             mmw[ipro] = calc_mmw(self.gas_id_list,VMR_model[ipro,:])
         
         if A_model is not None:
+            assert self.phase_func is not None, \
+                    'Phase func has not been set'
+            assert A_model.shape[1] == self.phase_func.shape[0], \
+                    'Inconsistency in NMODES. Check that A_model and phase_func have same number of modes'
+            
             for imode in range(A_model.shape[1]):
                 A_model[:,imode] = A_model[:,imode] * mmw / N_A / AMU * 1e-4
 
@@ -560,6 +565,8 @@ class ForwardModel():
                 disc_spectrum += point_spectrum * weight
         return disc_spectrum
     
+    def clear_phase_function(self):
+        self.phase_func = None
 
     def set_phase_function(self, mean_size, size_variance, n_imag, n_imag_wave_grid, n_real_reference,
                    n_real_reference_wave = None, normalising_wave = None, ispace=1):
@@ -635,4 +642,8 @@ class ForwardModel():
 #         for iphas in range(2,5):
 #             phase_func[0,:, iphas] = np.interp(wave_grid,n_imag_wave_grid,\
 #                                                small_phase_func[0,:, iphas])
-        self.phase_func = phase_func
+
+        if self.phase_func is None:
+            self.phase_func = phase_func
+        else:
+            self.phase_func = np.concatenate([self.phase_func,phase_func],axis = 0)
