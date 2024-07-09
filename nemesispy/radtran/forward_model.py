@@ -569,7 +569,7 @@ class ForwardModel():
         self.phase_func = None
 
     def set_phase_function(self, mean_size, size_variance, n_imag, n_imag_wave_grid, n_real_reference,
-                   n_real_reference_wave = None, normalising_wave = None, ispace=1):
+                   n_real_reference_wave = None, normalising_wave = None, ispace=1, iscat=1):
 
         """
         Calculates extinction and scattering cross-sections, along with fitted phase function parameters,
@@ -609,17 +609,23 @@ class ForwardModel():
         if normalising_wave is None:
             normalising_wave = wave_grid[0]      
 
-        n_real_reference_wave = np.array([n_real_reference_wave]) #placeholders before adding multiple modes
+        n_real_reference_wave = np.array([n_real_reference_wave])
         normalising_wave = np.array([normalising_wave])
         
-            
-        # Assuming iscat = 1 (standard gamma)
         size_distribution_parameters = np.array([mean_size,size_variance,(1-3*size_variance)/size_variance])
-
+        
+        
+        # iscat = 1,2,4 implemented (gamma, log-normal, single particle size) 
+        if iscat not in [1,2,4]:
+            print(f'ISCAT={iscat} NOT IMPLEMENTED')
+            return
+        
+        
+            
         size_integration_bounds = np.array([0.015*np.min(n_imag_wave_grid), 0.0, 0.015*np.min(n_imag_wave_grid)]) 
 
         small_phase_func = makephase(wave_grid = n_imag_wave_grid,
-                             iscat = np.array([1]),
+                             iscat = np.array([iscat]),
                              dsize = size_distribution_parameters,
                              rs = size_integration_bounds,
                              nimag_wave_grid = n_imag_wave_grid,
@@ -638,10 +644,6 @@ class ForwardModel():
 
         phase_func[0,:, :2] = phase_func[0,:, :2] / xext_norm
 
-
-#         for iphas in range(2,5):
-#             phase_func[0,:, iphas] = np.interp(wave_grid,n_imag_wave_grid,\
-#                                                small_phase_func[0,:, iphas])
 
         if self.phase_func is None:
             self.phase_func = phase_func
