@@ -214,9 +214,10 @@ class ForwardModel():
         for ipro in range(NPRO):
             mmw[ipro] = calc_mmw(self.gas_id_list,VMR_model[ipro,:])
         
-        for imode in range(A_model.shape[1]):
-            A_model[:,imode] = A_model[:,imode] * mmw / N_A / AMU * 1e-4
-        
+        if A_model is not None:
+            for imode in range(A_model.shape[1]):
+                A_model[:,imode] = A_model[:,imode] * mmw / N_A / AMU * 1e-4
+
         
         H_layer,P_layer,T_layer,VMR_layer,U_layer,A_layer,dH,scale \
             = calc_layer(
