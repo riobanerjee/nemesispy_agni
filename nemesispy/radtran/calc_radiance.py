@@ -514,7 +514,7 @@ def calc_contrib(wave_grid, H_layer, H_base, U_layer, P_layer,P_base, T_layer, V
 
 
 @jit(nopython=True)
-def calc_radiance(wave_grid, U_layer, P_layer, T_layer, VMR_layer,mmw, Ptop,
+def calc_radiance(wave_grid, U_layer, P_layer, T_layer, VMR_layer, mmw, Ptop,
     k_gas_w_g_p_t, P_grid, T_grid, del_g, ScalingFactor, R_plt, solspec,
     k_cia, ID, cia_nu_grid, cia_T_grid, dH, A_layer, phase_func, angles):
     """

@@ -201,7 +201,7 @@ class ForwardModel():
 
         return weighting_function
 
-    def calc_point_spectrum(self, H_model, P_model, T_model, VMR_model, Ptop,
+    def calc_point_spectrum(self, H_model, P_model, T_model, VMR_model, Ptop=None,
         angles = np.array([0.,0.,0.]), solspec=[], A_model=None):
         """
         Calculate average layer properties from model inputs,
@@ -215,13 +215,14 @@ class ForwardModel():
             mmw[ipro] = calc_mmw(self.gas_id_list,VMR_model[ipro,:])
         
         if A_model is not None:
-            assert self.phase_func is not None, \
-                    'Phase func has not been set'
-            assert A_model.shape[1] == self.phase_func.shape[0], \
-                    'Inconsistency in NMODES. Check that A_model and phase_func have same number of modes'
-            
-            for imode in range(A_model.shape[1]):
-                A_model[:,imode] = A_model[:,imode] * mmw / N_A / AMU * 1e-4
+            if np.any(A_model>0):
+                assert self.phase_func is not None, \
+                        'Phase func has not been set'
+                assert A_model.shape[1] == self.phase_func.shape[0], \
+                        'Inconsistency in NMODES. Check that A_model and phase_func have same number of modes'
+
+                for imode in range(A_model.shape[1]):
+                    A_model[:,imode] = A_model[:,imode] * mmw / N_A / AMU * 1e-4
 
         
         H_layer,P_layer,T_layer,VMR_layer,U_layer,A_layer,dH,scale \
@@ -234,7 +235,7 @@ class ForwardModel():
         
         if len(solspec)==0:
             solspec = np.ones(len(self.wave_grid))
-            
+
         point_spectrum = calc_radiance(self.wave_grid, U_layer, P_layer, T_layer,
             VMR_layer, mmw, Ptop, self.k_gas_w_g_p_t, self.k_table_P_grid,
             self.k_table_T_grid, self.del_g, ScalingFactor=scale,
@@ -473,7 +474,7 @@ class ForwardModel():
 
     def calc_disc_spectrum(self,phase,nmu,P_model,
         global_model_P_grid,global_T_model,global_VMR_model,
-        mod_lon,mod_lat,solspec,global_aerosol_model):
+        mod_lon,mod_lat,solspec,global_A_model=None):
         """
         Parameters
         ----------
@@ -491,22 +492,27 @@ class ForwardModel():
         wav = np.around(wav,decimals=8)
         fov_latitudes = wav[0,:]
         fov_longitudes = wav[1,:]
-        fov_stellar_zen = wav[2,:]
+        fov_sol_angles = wav[2,:]
         fov_emission_angles = wav[3,:]
-        fov_stellar_azi = wav[4,:]
+        fov_azimuth_angles = wav[4,:]
         fov_weights = wav[5,:]
 
         for iav in range(nav):
             xlon = fov_longitudes[iav]
             xlat = fov_latitudes[iav]
-            T_model, VMR_model = interp_gcm(
+            T_model, VMR_model, A_model = interp_gcm(
                 lon=xlon,lat=xlat, p=P_model,
                 gcm_lon=mod_lon, gcm_lat=mod_lat,
                 gcm_p=global_model_P_grid,
                 gcm_t=global_T_model, gcm_vmr=global_VMR_model,
+                gcm_a=global_A_model,
                 substellar_point_longitude_shift=180)
-
+            
+            sol_angle = fov_sol_angles[iav]
             path_angle = fov_emission_angles[iav]
+            azi_angle = fov_azimuth_angles[iav]
+
+            angles = np.array([sol_angle,path_angle,azi_angle])
             weight = fov_weights[iav]
             NPRO = len(P_model)
             mmw = np.zeros(NPRO)
@@ -516,8 +522,8 @@ class ForwardModel():
                 M_plt=self.M_plt, R_plt=self.R_plt)
 
             point_spectrum = self.calc_point_spectrum(
-                H_model, P_model, T_model, VMR_model, path_angle,
-                solspec=solspec)
+                H_model, P_model, T_model, VMR_model, angles = angles,
+                solspec=solspec, A_model=A_model)
 
             disc_spectrum += point_spectrum * weight
         return disc_spectrum
@@ -568,7 +574,7 @@ class ForwardModel():
     def clear_phase_function(self):
         self.phase_func = None
 
-    def set_phase_function(self, mean_size, size_variance, n_imag, n_imag_wave_grid, n_real_reference,
+    def add_phase_function(self, mean_size, size_variance, n_imag, n_imag_wave_grid, n_real_reference,
                    n_real_reference_wave = None, normalising_wave = None, ispace=1, iscat=1):
 
         """

@@ -36,7 +36,7 @@ def interp_1D(X,Y,XIN):
     return YOUT
 
 @jit(nopython=True)
-def interp_gcm(lon, lat, p, gcm_lon, gcm_lat, gcm_p, gcm_t, gcm_vmr,
+def interp_gcm(lon, lat, p, gcm_lon, gcm_lat, gcm_p, gcm_t, gcm_vmr, gcm_a = None,
     substellar_point_longitude_shift=0):
     """
     Find the T(P) profile and VMR(P) profile at a location specified by (lon,lat)
@@ -62,6 +62,9 @@ def interp_gcm(lon, lat, p, gcm_lon, gcm_lat, gcm_p, gcm_t, gcm_vmr,
     gcm_vmr : ndarray
         VMR model.
         NLON x NLAT x NPRESS x NVMR
+    gcm_vmr : ndarray
+        A model.
+        NLON x NLAT x NPRESS x NMODES
     substellar_point_longitude_shift : real
         The longitude shift between the longitude-lattitude coordinate system
         of the GCM model to the output coordinate system. For example, if in the
@@ -77,7 +80,8 @@ def interp_gcm(lon, lat, p, gcm_lon, gcm_lat, gcm_p, gcm_t, gcm_vmr,
         Temperature model interpolated to (lon,lat,p)
     VMR : ndarray
         VMR model interpolated to (lon,lat,p)
-
+    A : ndarray
+        Aerosol model interpolated to (lon,lat,p)
     """
     # Check input latitude make sense
     assert lat <= 90 and lat >= -90, "Input latitude out of range [-90,90]"
@@ -95,7 +99,11 @@ def interp_gcm(lon, lat, p, gcm_lon, gcm_lat, gcm_p, gcm_t, gcm_vmr,
 
     # Dimension parameters of the atmospheric model
     NLON,NLAT,NPRESS,NVMR = gcm_vmr.shape
-
+    
+    NMODES = 1
+    if gcm_a is not None:
+        NMODES = gcm_a.shape[-1]
+    
     # Convert to log pressure
     log_gcm_P = np.log(gcm_p)
 
@@ -145,6 +153,7 @@ def interp_gcm(lon, lat, p, gcm_lon, gcm_lat, gcm_p, gcm_t, gcm_vmr,
     # Output arrays
     interped_T = np.zeros(NPRO)
     interped_VMR = np.zeros((NPRO,NVMR))
+    interped_A = np.zeros((NPRO,NMODES))
 
     # Temperature interpolation array
     tempVY1 = gcm_t[JLON1,JLAT,:]
@@ -171,8 +180,20 @@ def interp_gcm(lon, lat, p, gcm_lon, gcm_lat, gcm_p, gcm_t, gcm_vmr,
             gasY4 = interp_1D(log_gcm_P,gasVY4,LP1)
             interped_VMR[IPRO,IVMR] = (1.0-FLON)*(1.0-FLAT)*gasY1 + FLON*(1.0-FLAT)*gasY2\
                 + FLON*FLAT*gasY3 + (1.0-FLON)*FLAT*gasY4
+        if gcm_a is not None:
+            for IMODE in range(NMODES):
+                aeroVY1 = gcm_a[JLON1,JLAT,:,IMODE]
+                aeroVY2 = gcm_a[JLON2,JLAT,:,IMODE]
+                aeroVY3 = gcm_a[JLON2,JLAT+1,:,IMODE]
+                aeroVY4 = gcm_a[JLON1,JLAT+1,:,IMODE]
+                aeroY1 = interp_1D(log_gcm_P,aeroVY1,LP1)
+                aeroY2 = interp_1D(log_gcm_P,aeroVY2,LP1)
+                aeroY3 = interp_1D(log_gcm_P,aeroVY3,LP1)
+                aeroY4 = interp_1D(log_gcm_P,aeroVY4,LP1)
+                interped_A[IPRO,IMODE] = (1.0-FLON)*(1.0-FLAT)*aeroY1 + FLON*(1.0-FLAT)*aeroY2\
+                    + FLON*FLAT*aeroY3 + (1.0-FLON)*FLAT*aeroY4
 
-    return interped_T, interped_VMR
+    return interped_T, interped_VMR, interped_A
 
 @jit(nopython=True)
 def interp_gcm_X(lon, lat, p, gcm_lon, gcm_lat, gcm_p, X,

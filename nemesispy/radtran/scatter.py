@@ -931,7 +931,7 @@ def idown(ra, ta, ja, rb, tb, jb, u0pl, utmi):
     upl = np.dot(bcom, xcom)
     return upl
 
-@njit(fastmath = True,parallel=False, cache = False, error_model='numpy')
+@njit(fastmath = True,parallel=False, cache = os.environ.get("USE_NUMBA_CACHE")=='True', error_model='numpy')
 def scloud11wave(phasarr, radg, sol_ang, emiss_ang, solar, aphi, lowbc, galb, mu1, wt1, nf,
                 vwaves, bnu, tau, tauray,omegas, nphi,iray, lfrac, imie=0):
     
@@ -1082,7 +1082,7 @@ def scloud11wave(phasarr, radg, sol_ang, emiss_ang, solar, aphi, lowbc, galb, mu
     
     fc = np.ones((ncont+1,nmu,nmu))
     
-    for widx in prange(len(vwaves)):
+    for widx in range(len(vwaves)):
         converged = False
         conv1 = False
         vwave = vwaves[widx]
