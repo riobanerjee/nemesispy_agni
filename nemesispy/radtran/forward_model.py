@@ -575,11 +575,10 @@ class ForwardModel():
         self.phase_func = None
 
     def add_phase_function(self, mean_size, size_variance, n_imag, n_imag_wave_grid, n_real_reference,
-                   n_real_reference_wave = None, normalising_wave = None, ispace=1, iscat=1):
-
+                           n_real_reference_wave=None, normalising_wave=None, ispace=1, iscat=1):
         """
         Calculates extinction and scattering cross-sections, along with fitted phase function parameters,
-        for an aerosol species with defined properties, assuming a standard gamma distribution.
+        for an aerosol species with defined properties.
 
         Parameters
         ----------
@@ -593,8 +592,8 @@ class ForwardModel():
             Grid of imaginary refractive indices
         n_imag_wave_grid(NWAVEIMAG) : ndarray
             Grid of wavelengths that n_imag lies on
-        n_real_reference : float
-            Reference real refractive index
+        n_real_reference : float or ndarray
+            Reference real refractive index or grid of real refractive indices
         n_real_reference_wave : float
             Wavelength that the n_real_reference corresponds to. Defaults to wave_grid[0]
         normalising_wave : float
@@ -608,47 +607,64 @@ class ForwardModel():
         """
         wave_grid = self.wave_grid
 
-        phase_func = np.zeros((1,len(wave_grid),6))
-        
+        phase_func = np.zeros((1, len(wave_grid), 6))
+
         if n_real_reference_wave is None:
             n_real_reference_wave = wave_grid[0]
         if normalising_wave is None:
-            normalising_wave = wave_grid[0]      
+            normalising_wave = wave_grid[0]
 
         n_real_reference_wave = np.array([n_real_reference_wave])
         normalising_wave = np.array([normalising_wave])
-        
-        
-        # iscat = 1,2,4 implemented (gamma, log-normal, single particle size) 
+
+        # iscat = 1,2,4 implemented (gamma, log-normal, single particle size)
         if iscat == 1:
-            size_distribution_parameters = np.array([mean_size,size_variance,(1-3*size_variance)/size_variance])
-            size_integration_bounds = np.array([0.015*np.min(n_imag_wave_grid), 0.0, 0.015*np.min(n_imag_wave_grid)]) 
+            size_distribution_parameters = np.array([mean_size, size_variance, (1 - 3 * size_variance) / size_variance])
+            size_integration_bounds = np.array([0.015 * np.min(n_imag_wave_grid), 0.0, 0.015 * np.min(n_imag_wave_grid)])
         elif iscat == 2:
-            size_distribution_parameters = np.array([mean_size,size_variance])
-            size_integration_bounds = np.array([0.015*np.min(n_imag_wave_grid), 0.0, 0.015*np.min(n_imag_wave_grid)]) 
+            size_distribution_parameters = np.array([mean_size, size_variance])
+            size_integration_bounds = np.array([0.015 * np.min(n_imag_wave_grid), 0.0, 0.015 * np.min(n_imag_wave_grid)])
         elif iscat == 4:
-            size_distribution_parameters = np.array([mean_size,0,0])
-            size_integration_bounds = np.array([mean_size,mean_size,mean_size]) 
-            
+            size_distribution_parameters = np.array([mean_size, 0, 0])
+            size_integration_bounds = np.array([mean_size, mean_size, mean_size])
         else:
             print(f'ISCAT={iscat} NOT IMPLEMENTED')
             return
-            
 
-        small_phase_func = makephase(wave_grid = n_imag_wave_grid,
-                             iscat = np.array([iscat]),
-                             dsize = size_distribution_parameters,
-                             rs = size_integration_bounds,
-                             nimag_wave_grid = n_imag_wave_grid,
-                             nreal_ref = np.array([n_real_reference]),
-                             nimag = n_imag,
-                             refwave = n_real_reference_wave,
-                             ispace = ispace)[None,:]
-    
-    
+        assert len(n_imag) == len(n_imag_wave_grid),\
+            'n_imag and n_imag_wave_grid have different lengths'
+        
+        
+        if isinstance(n_real_reference, (list, np.ndarray)):
+            
+            assert len(n_real_reference) == len(n_imag_wave_grid),\
+            'n_real_reference and n_imag_wave_grid have different lengths'
+            
+            n_real_reference = np.array(n_real_reference)
+            small_phase_func = makephase(wave_grid=n_imag_wave_grid,
+                                         iscat=np.array([iscat]),
+                                         dsize=size_distribution_parameters,
+                                         rs=size_integration_bounds,
+                                         nimag_wave_grid=n_imag_wave_grid,
+                                         nreal_ref=n_real_reference,
+                                         nimag=n_imag,
+                                         refwave=n_imag_wave_grid,
+                                         ispace=ispace)[None, :]
+        else:
+            small_phase_func = makephase(wave_grid=n_imag_wave_grid,
+                                         iscat=np.array([iscat]),
+                                         dsize=size_distribution_parameters,
+                                         rs=size_integration_bounds,
+                                         nimag_wave_grid=n_imag_wave_grid,
+                                         nreal_ref=np.array([n_real_reference]),
+                                         nimag=n_imag,
+                                         refwave=n_real_reference_wave,
+                                         ispace=ispace)[None, :]
+
         spline = CubicSpline(n_imag_wave_grid, 
-                              small_phase_func[0,:, :], 
-                              axis=0)
+                             small_phase_func[0, :, :], 
+                             axis=0)
+
 
         phase_func[0,:, :] = spline(wave_grid)
         xext_norm = spline(normalising_wave)[0][0]
