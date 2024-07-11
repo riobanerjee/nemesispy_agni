@@ -531,8 +531,12 @@ def makephase(wave_grid, iscat, dsize, rs, nimag_wave_grid,
     data_arr = np.zeros((nwave, 6))
     max_theta = 100
     theta, ntheta, nphase = get_theta(max_theta)
-    nreal = kk_new_sub(nimag_wave_grid,nimag,refwave[0],nreal_ref[0])
     
+    if np.any(refwave != nimag_wave_grid):
+        nreal = kk_new_sub(nimag_wave_grid,nimag,refwave[0],nreal_ref[0])
+    else:
+        nreal = nreal_ref
+        
     for j in range(len(nimag_wave_grid)):
         w = nimag_wave_grid[j]
         if ispace == 1:
