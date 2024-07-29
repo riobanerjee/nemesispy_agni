@@ -735,6 +735,10 @@ def elemultvec(matrix, vector, result, n):
             result[i, 0] += matrix[i, j] * vector[j,0]
 
 
+@njit
+def frob(r):
+    return np.sqrt((r**2).sum())
+
 @njit(fastmath=True)
 def add(r1, t1, j1, e, nmu,ic):
     rsq = np.zeros_like(r1)
@@ -746,7 +750,7 @@ def add(r1, t1, j1, e, nmu,ic):
     jans = np.zeros_like(j1)
     
     elemult(r1,r1,rsq,nmu)
-    if rsq[-1,-1]>0.01: # Spectral radius: Neumann series + Gershgorin circle theorem (bit dodgy)
+    if frob(r1)>0.1: # Frobenius norm < 0.1 for approximation to keep error under 1e-4
         acom = np.linalg.solve(e - rsq, e)
     else: 
         acom = e + rsq
@@ -869,7 +873,7 @@ def addp(r1, t1, j1, iscat1,e, rsub, tsub, jsub, jdim, nmu): #needs checking
         
         # Second layer is scattering
         elemult(rsub,r1,rsq,nmu)
-        if rsq[-1,-1]>0.01: # Spectral radius: Neumann series + Gershgorin circle theorem (bit dodgy)
+        if frob(rsq)>0.01:
             acom = np.linalg.solve(e - rsq, e)
             elemult(t1,acom,ccom,nmu)
         else:

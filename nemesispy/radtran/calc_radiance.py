@@ -560,7 +560,6 @@ def calc_radiance(wave_grid, U_layer, P_layer, T_layer, VMR_layer, mmw, Ptop,
     solspec : ndarray
         Stellar spectra, used when the unit of the output is in fraction
         of stellar irradiance.
-
         Stellar flux at planet's distance (W cm-2 um-1 or W cm-2 (cm-1)-1)
 
     Returns
@@ -674,7 +673,7 @@ def calc_radiance(wave_grid, U_layer, P_layer, T_layer, VMR_layer, mmw, Ptop,
         
         for ig in range(NG):
             
-            spec_w_g[:,ig] = calc_spectrum_scloud11(wave_grid, phase_func,radground,solspec,
+            spec_w_g[:,ig] = calc_spectrum_scloud11(wave_grid, phase_func,radground,
                                                     tau_total_w_g_l[:,ig],tau_rayleigh,
                                                     omegas[:,ig],lfrac,planck,angles) * xfac
     # Integrate over g-ordinates

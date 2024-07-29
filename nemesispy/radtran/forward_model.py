@@ -481,7 +481,6 @@ class ForwardModel():
         phase : real
             Orbital phase, increase from 0 at primary transit to 180 and secondary
             eclipse.
-        aerosol_mode: 
 
         """
         # initialise output array
@@ -530,8 +529,8 @@ class ForwardModel():
 
     def calc_disc_spectrum_uniform(self, nmu, P_model, T_model, VMR_model,
         H_model=[],solspec=[], A_model=None):
-        """Caculate the disc integrated spectrum of a homogeneous atmosphere
-        A_Model = Aerosol
+        """
+        Calculate the disc integrated spectrum of a homogeneous atmosphere
         """
         # initialise output array
         disc_spectrum = np.zeros(len(self.wave_grid))
@@ -572,6 +571,10 @@ class ForwardModel():
         return disc_spectrum
     
     def clear_phase_function(self):
+        """
+        Resets FM.phase_func.
+        """
+        
         self.phase_func = None
 
     def add_phase_function(self, mean_size, size_variance, n_imag, n_imag_wave_grid, n_real_reference,
