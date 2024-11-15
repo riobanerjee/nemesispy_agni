@@ -3,7 +3,7 @@
 import numpy as np
 import scipy as sp
 from scipy import special
-from nemesispy.common.constants import R_SUN,M_SUN
+from nemesispy.common.constants import R_SUN,M_SUN,ATM
 
 def TP_Guillot(P,g_plt,T_eq,k_IR,gamma,f,T_int=100):
     """
@@ -119,4 +119,24 @@ def TP_Line(P,g_plt,T_eq,k,g1,g2,alpha,beta,T_int):
     flux2 = (0.75 * T_irr**4) * (1-alpha) * xi1
     flux3 = (0.75 * T_irr**4) * alpha * xi2
     TP = (flux1+flux2+flux3)**0.25
+    return TP
+
+def TP_madhu(P,P1,P2,P3,T0,alpha1,alpha2):
+    TP = np.zeros(len(P))
+    P1 = (10.0**P1) * ATM
+    P2 = (10.0**P2) * ATM
+    P3 = (10.0**P3) * ATM
+    P0 = np.amin(P)
+    T2 = ((1/alpha1) * np.log10(P1/P0))**2.0 - ((1/alpha2)*np.log10(P1/P2))**2.0+T0
+    T3 = ((1/alpha2) * np.log10(P3/P2))**2.0 + T2
+    
+    for i in range(len(P)):         
+        if(P[i] >= P3):
+            TP[i] = T3
+        else:
+            if(P[i] >= P1):
+                TP[i] = ((1/alpha2) * np.log10(P[i]/P2))**2.0 + T2
+            else:
+                TP[i] = ((1/alpha1) * np.log10(P[i]/P0))**2.0 + T0
+    
     return TP
