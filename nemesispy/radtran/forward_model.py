@@ -65,6 +65,7 @@ class ForwardModel():
 
         # Multiple scattering
         self.phase_func = None
+        
 
     def set_planet_model(self, M_plt, R_plt, gas_id_list, iso_id_list, NLAYER,
         gas_name_list=None, solspec=None, R_star=None, T_star=None,
@@ -202,12 +203,15 @@ class ForwardModel():
         return weighting_function
 
     def calc_point_spectrum(self, H_model, P_model, T_model, VMR_model, Ptop=None,
-        angles = np.array([0.,0.,0.]), solspec=[], A_model=None):
+        angles = np.array([0.,0.,0.]), solspec=[], A_model=None, uniform = False):
         """
         Calculate average layer properties from model inputs,
         then compute the spectrum at a single point on the disc.
         """
         path_angle = angles[1]
+        
+        if uniform and tuple(angles) in self.point_spectra_cache.keys():
+            return self.point_spectra_cache[tuple(angles)]
         
         NPRO = len(P_model)
         mmw = np.zeros(P_model.shape)
@@ -215,6 +219,7 @@ class ForwardModel():
             mmw[ipro] = calc_mmw(self.gas_id_list,VMR_model[ipro,:])
         
         if A_model is not None:
+            A_model = A_model.copy()
             if np.any(A_model>0):
                 assert self.phase_func is not None, \
                         'Phase func has not been set'
@@ -235,13 +240,17 @@ class ForwardModel():
         
         if len(solspec)==0:
             solspec = np.ones(len(self.wave_grid))
-
+            
         point_spectrum = calc_radiance(self.wave_grid, U_layer, P_layer, T_layer,
             VMR_layer, mmw, Ptop, self.k_gas_w_g_p_t, self.k_table_P_grid,
             self.k_table_T_grid, self.del_g, ScalingFactor=scale,
             R_plt=self.R_plt, solspec=solspec, k_cia=self.k_cia_pair_t_w,
             ID=self.gas_id_list,cia_nu_grid=self.cia_nu_grid,
             cia_T_grid=self.cia_T_grid, dH=dH, A_layer=A_layer, phase_func=self.phase_func, angles=angles)
+        
+        if uniform:
+            self.point_spectra_cache[tuple(angles)] = point_spectrum
+        
         return point_spectrum
     
     def calc_transm_spectrum(self, P_model, T_model, VMR_model,
@@ -450,7 +459,7 @@ class ForwardModel():
         return contribs, P_layer
 
     def calc_point_spectrum_hydro(self, P_model, T_model, VMR_model, Ptop=None,
-        angles=np.array([0.,0.,0.]), solspec=[], A_model=None):
+        angles=np.array([0.,0.,0.]), solspec=[], A_model=None, uniform = False):
         """
         Use the hydrodynamic equation to calculate layer height
         First get layer properties from model inputs
@@ -466,7 +475,7 @@ class ForwardModel():
             M_plt=self.M_plt, R_plt=self.R_plt)
 
         point_spectrum = self.calc_point_spectrum(H_model, P_model,
-            T_model, VMR_model, Ptop, angles, solspec, A_model=A_model)
+            T_model, VMR_model, Ptop, angles, solspec, A_model=A_model, uniform = uniform)
 
         return point_spectrum
 
@@ -527,14 +536,16 @@ class ForwardModel():
             disc_spectrum += point_spectrum * weight
         return disc_spectrum
 
-    def calc_disc_spectrum_uniform(self, nmu, P_model, T_model, VMR_model,
+    def calc_disc_spectrum_uniform(self, phase, nmu, P_model, T_model, VMR_model,
         H_model=[],solspec=[], A_model=None):
         """
         Calculate the disc integrated spectrum of a homogeneous atmosphere
         """
         # initialise output array
         disc_spectrum = np.zeros(len(self.wave_grid))
-        nav, wav = gauss_lobatto_weights(0, nmu)
+        self.point_spectra_cache = {}
+        
+        nav, wav = gauss_lobatto_weights(phase, nmu)
         
         fov_sol_angles = wav[2,:]
         fov_emission_angles = wav[3,:]
@@ -549,11 +560,10 @@ class ForwardModel():
                 azi_angle = fov_azimuth_angles[iav]
                 
                 angles = np.array([sol_angle,path_angle,azi_angle])
-                
                 weight = fov_weights[iav]
                 point_spectrum = self.calc_point_spectrum_hydro(
-                    P_model, T_model, VMR_model, angles,
-                    solspec=solspec, A_model=A_model)
+                    P_model, T_model, VMR_model, angles=angles,
+                    solspec=solspec, A_model=A_model, uniform = True)
                 disc_spectrum += point_spectrum * weight
         else:
             for iav in range(nav):
@@ -565,8 +575,8 @@ class ForwardModel():
                 
                 weight = fov_weights[iav]
                 point_spectrum = self.calc_point_spectrum(
-                    H_model, P_model, T_model, VMR_model, angles,
-                    solspec=solspec, A_model=A_model)
+                    H_model, P_model, T_model, VMR_model, angles=angles,
+                    solspec=solspec, A_model=A_model, uniform = True)
                 disc_spectrum += point_spectrum * weight
         return disc_spectrum
     

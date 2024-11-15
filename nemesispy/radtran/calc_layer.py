@@ -299,7 +299,9 @@ def average(planet_radius, H_model, P_model, T_model, VMR_model, ID, H_base,
         for J in range(Ngas):
             VMR_int[:,J] = np.interp(H_int,H_model,VMR_model[:,J])
             VMR_layer[ilayer, J] \
-                = simps(VMR_int[:,J]*dU_dS_int,S_int)/U_layer[ilayer]
+                = simps(P_int * VMR_int[:,J] * dU_dS_int, S_int) / (U_layer[ilayer] * P_layer[ilayer])
+#             VMR_layer[ilayer, J] \
+#                 = simps(VMR_int[:,J]*dU_dS_int,S_int)/U_layer[ilayer]
             
         for J in range(NMODES):
             A_int[:,J] = np.interp(H_int,H_model,A_model[:,J])

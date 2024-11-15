@@ -11,7 +11,7 @@ As of now the routines are fully accelerated using numba.jit.
 """
 import numpy as np
 import random
-from numba import jit
+from numba import jit,prange
 from nemesispy.radtran.calc_planck import calc_planck
 from nemesispy.radtran.calc_tau_gas import calc_tau_gas
 from nemesispy.radtran.calc_tau_gas import calc_tau_gas_comp
@@ -513,7 +513,7 @@ def calc_contrib(wave_grid, H_layer, H_base, U_layer, P_layer,P_base, T_layer, V
     return td_percent
 
 
-@jit(nopython=True)
+@jit(nopython=True,parallel=False)
 def calc_radiance(wave_grid, U_layer, P_layer, T_layer, VMR_layer, mmw, Ptop,
     k_gas_w_g_p_t, P_grid, T_grid, del_g, ScalingFactor, R_plt, solspec,
     k_cia, ID, cia_nu_grid, cia_T_grid, dH, A_layer, phase_func, angles):
@@ -624,8 +624,8 @@ def calc_radiance(wave_grid, U_layer, P_layer, T_layer, VMR_layer, mmw, Ptop,
                                             /tau_total_w_g_l[iwave,ig,ilayer]
 
     # Scale to the line-of-sight opacities
-    tau_total_w_g_l *=  ScalingFactor
-    tau_rayleigh *= ScalingFactor
+    tau_total_w_g_l = tau_total_w_g_l *  ScalingFactor
+    tau_rayleigh = tau_rayleigh * ScalingFactor
 
     # Defining the units of the output spectrum / divide by stellar spectrum
     # radextra = np.sum(dH[:-1])
@@ -665,11 +665,10 @@ def calc_radiance(wave_grid, U_layer, P_layer, T_layer, VMR_layer, mmw, Ptop,
 
     else:
         radground = calc_planck(wave_grid,T_layer[-1]) * np.ones((5,NWAVE))
+        
         planck = np.zeros((NWAVE,NLAYER))
         for ilayer in range(NLAYER):
             planck[:,ilayer] = calc_planck(wave_grid,T_layer[ilayer])
-
-        
         
         for ig in range(NG):
             
